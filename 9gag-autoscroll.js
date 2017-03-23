@@ -1,9 +1,22 @@
 (function () {
 
+  // If true, auto scrolling stopped. If false, it is running.
+  // If 'pending', it is still running but it will stop as soon as it gets to read the value of stopped.
+  var stopped = true;
+
+  const controlsBarHeightPx = 40;
+
+  var speed = 1.0;  // Speed of scrolling.
+
   function isElementInViewport (element) {
     var rect = element.getBoundingClientRect();
     return rect.top >= 0 && rect.top <= $(window).height()
       || rect.bottom >= 0 && rect.bottom <= $(window).height();
+  }
+
+  function setSpeed (newSpeed) {
+    speed = Math.min(3.0, Math.max(0.2, newSpeed));
+    console.log('auto scroll speed: ', speed);
   }
 
   function findLastPostInScreen () {
@@ -80,25 +93,25 @@
               }, 1000);
             }
           });
-        }, 3000);
+        }, 4000);
       } else {
         var jImage = $(post).find('div.post-content img');
-        if (jImage[0].getBoundingClientRect().bottom > $(window).height()) {
+        if (jImage[0].getBoundingClientRect().bottom > $(window).height() - controlsBarHeightPx) {
           // If post is long and does not fit in the screen, scroll slowly through it.
-          var pixelsOutOfScreen = jImage[0].getBoundingClientRect().bottom - $(window).height();
-          console.log(pixelsOutOfScreen);
-          $('html, body').delay(6000).animate({
-            scrollTop: jImage.offset().top + jImage.height() - $(window).height()
+          var pixelsOutOfScreen = jImage[0].getBoundingClientRect().bottom
+                - $(window).height() + controlsBarHeightPx;
+          $('html, body').delay(6000 / speed).animate({
+            scrollTop: jImage.offset().top + jImage.height() - $(window).height() + controlsBarHeightPx
           }, pixelsOutOfScreen * 15).promise().then(function () {
             window.setTimeout(function () {
               deferred.resolve();
-            }, 2000);
+            }, 2000 / speed);
           });
         } else {
           // If post is just a simple image, wait a certain period of time.
           window.setTimeout(function () {
             deferred.resolve();
-          }, 9000);
+          }, 9000 / speed);
         }
       }
     });
@@ -107,12 +120,102 @@
   }
 
   // Moves from one post to another, starting from the given post.
-  function viewPostsStartingFrom (startPost) {
+  function scrollPostsStartingFrom (startPost) {
+    if (stopped != false) {
+      stopped = true;
+      return;
+    }
     viewPost(startPost).then(function () {
-      viewPostsStartingFrom(findNextPost(startPost));
+      scrollPostsStartingFrom(findNextPost(startPost));
     });
   }
 
-  viewPostsStartingFrom(findLastPostInScreen());
+  // Main method.
+  // Start scrolling from the current post on the screen.
+  function startScrolling () {
+    var scrollIsRunning = stopped === false || stopped === 'pending';
+    stopped = false;
+    if (!scrollIsRunning) {
+      scrollPostsStartingFrom(findLastPostInScreen());
+    }
+  }
+
+  function stopScrolling () {
+    if (stopped === false) {
+      stopped = 'pending';
+    }
+    // TODO: stop and play mechanism is not really working well! It is hard to actually stop the
+    // viewing of current post. We should somehow be able to interrupt the viewing of the post and go on.
+    // Right now we have to wait until 'pending' is recognized by the current post viewing mechanism, which
+    // often takes a lof of time and if users presses play in the meantime it will not behave as expected.
+    // Idea: keep a pool of all timeouts and promises, and on stop just destroy them all and then start new
+    // scrolling.
+  }
+
+  function initControlsBar () {
+    var jControlsBar = $('<div/>', {
+      id: 'auto9gag-controls'
+    }).css({
+      height: controlsBarHeightPx + 'px',
+      position: 'fixed',
+      bottom: '0%',
+      width: '100%',
+      'background-color': 'black',
+      display: 'flex',
+      'justify-content': 'space-around'
+    }).css({
+      display: '-webkit-flex'
+    });
+
+    var jPlayButton = $('<div/>', {
+      id: 'auto9gag-play',
+      text: 'Stop'
+    }).css({
+      color: 'white',
+      'line-height': controlsBarHeightPx + 'px',
+      'font-weight': 'bold',
+      'font-size': '18px'
+    }).click(function () {
+      if (stopped) {
+        $(this).text('Stop');
+        startScrolling();
+      } else {
+        $(this).text('Play');
+        stopScrolling();
+      }
+    });
+
+    var jSpeedUpButton = $('<div/>', {
+      id: 'auto9gag-speed-up',
+      text: 'Faster'
+    }).css({
+      color: 'white',
+      'line-height': controlsBarHeightPx + 'px',
+      'font-weight': 'bold',
+      'font-size': '18px'
+    }).click(function () {
+      setSpeed(speed + 0.2);
+    });
+
+    var jSpeedDownButton = $('<div/>', {
+      id: 'auto9gag-speed-down',
+      text: 'Slower'
+    }).css({
+      color: 'white',
+      'line-height': controlsBarHeightPx + 'px',
+      'font-weight': 'bold',
+      'font-size': '18px'
+    }).click(function () {
+      setSpeed(speed - 0.2);
+    });
+
+    jPlayButton.appendTo(jControlsBar);
+    jSpeedDownButton.appendTo(jControlsBar);
+    jSpeedUpButton.appendTo(jControlsBar);
+    jControlsBar.appendTo('body');
+  }
+
+  initControlsBar();
+  startScrolling();
 
 })();
