@@ -1,7 +1,7 @@
 (function () {
 
   function isElementInViewport (element) {
-    var rect = element.getBoundingClientRect();
+    let rect = element.getBoundingClientRect();
     return rect.top >= 0 && rect.top <= $(window).height()
       || rect.bottom >= 0 && rect.bottom <= $(window).height();
   }
@@ -24,14 +24,14 @@
      * @param offsetBottomPx
      */
     scrollToBottomSlowly (offsetBottomPx) {
-      var jImage = $(this.element).find('div.post-content img');
+      let jImage = $(this.element).find('div.post-content img');
       // If post is long and does not fit in the screen, scroll slowly through it.
-      var distancePx = jImage[0].getBoundingClientRect().bottom
+      let distancePx = jImage[0].getBoundingClientRect().bottom
             - $(window).height() + offsetBottomPx;
       return $('html, body').animate({
         scrollTop: jImage.offset().top + jImage.height()
           - $(window).height() + offsetBottomPx
-      }, distancePx * 15).promise();
+      }, distancePx * 10).promise();
     }
 
     /**
@@ -39,7 +39,7 @@
      * @returns True if bottom of the post is under the screen (overflows).
      */
     overflows (offsetBottomPx) {
-      var jImage = $(this.element).find('div.post-content img');
+      let jImage = $(this.element).find('div.post-content img');
       return jImage[0].getBoundingClientRect().bottom > $(window).height() - offsetBottomPx;
     }
 
@@ -67,41 +67,39 @@
      * @return promise when video is finished playing and paused.
      */
     playVideo (minPlayTimeMs) {
-      var post = this;
-      if (!post.isVideo()) return console.error(post, ' is not a video post');
-      var deferred = new $.Deferred();
+      if (!this.isVideo()) return console.error(this, ' is not a video post');
       minPlayTimeMs = Math.max(minPlayTimeMs || 4000, 1000);
 
-      // Click on image to load and run a video.
-      // Here we asume that video was not already loaded and that there
-      // is no video tag yet, only image.
-      $(post.element).find('div.post-content img').click();
-      window.setTimeout(function () {
-        var jVideo = $(post.element).find('div.post-content video');
-        var lastTime = 0;
-        var onTimeUpdate = function () {
-          var currentTime = jVideo[0].currentTime;
-          if (currentTime >= lastTime) {
-            lastTime = currentTime;
-          } else {  // Video restarted.
-            jVideo[0].pause();
-            jVideo.off('timeupdate', onTimeUpdate);
-            deferred.resolve();
-          }
-        };
-        jVideo.on('timeupdate', onTimeUpdate);
-      }, minPlayTimeMs);  // Let video play for at least minPlayTimeMs miliseconds.
-
-      return deferred.promise();
+      return new Promise((resolve, reject) => {
+        // Click on image to load and run a video.
+        // Here we asume that video was not already loaded and that there
+        // is no video tag yet, only image.
+        $(this.element).find('div.post-content img').click();
+        window.setTimeout(() => {
+          let jVideo = $(this.element).find('div.post-content video');
+          let lastTime = 0;
+          let onTimeUpdate = () => {
+            let currentTime = jVideo[0].currentTime;
+            if (currentTime >= lastTime) {
+              lastTime = currentTime;
+            } else {  // Video restarted.
+              jVideo[0].pause();
+              jVideo.off('timeupdate', onTimeUpdate);
+              resolve();
+            }
+          };
+          jVideo.on('timeupdate', onTimeUpdate);
+        }, minPlayTimeMs);  // Let video play for at least minPlayTimeMs miliseconds.
+      });
     }
 
     // Factory method, creates new post from the last post visible in the screen.
     static captureLastPostInScreen () {
-      var jPosts = $('article.post-cell');
+      let jPosts = $('article.post-cell');
 
       // We search for the last post that is visible in screen.
-      var currentPost = null;
-      for (var i = 0; i < jPosts.length; i++) {
+      let currentPost = null;
+      for (let i = 0; i < jPosts.length; i++) {
         if (isElementInViewport(jPosts[i])) {
           currentPost = jPosts[i];
         } else {
@@ -137,55 +135,51 @@
     // if it is a long post then it scrolls through it for you.
     // Returns promise which is executed when it believes you had enough time to view the post.
     _viewPost (post) {
-      var scroller = this;
-      var deferred = new $.Deferred();
-
-      post.scrollTo().then(function () {
-        if (post.isVeryLong() || post.isNSFW()) {
-          // If post requires user action to be viewed, just skip it.
-          deferred.resolve();
-        } else if (post.isVideo()) {
-          post.playVideo().then(function () {
-            // Wait for a second and then continue.
-            window.setTimeout(deferred.resolve, 1000);
-          });
-        } else {
-          if (post.overflows(scroller.controls.getHeightPx())) {
-            // If post is not visible in whole, wait for some time and then slowly
-            // scroll to its bottom.
-            window.setTimeout(function () {
-              post.scrollToBottomSlowly(scroller.controls.getHeightPx()).then(function () {
-                window.setTimeout(function () {
-                  deferred.resolve();
-                }, 2000 / scroller.speed);
-              });
-            }, 6000 / scroller.speed);
+      return new Promise((resolve, reject) => {
+        post.scrollTo().then(() => {
+          if (post.isVeryLong() || post.isNSFW()) {
+            // If post requires user action to be viewed, just skip it.
+            resolve();
+          } else if (post.isVideo()) {
+            post.playVideo().then(() => {
+              // Wait for a second and then continue.
+              window.setTimeout(resolve, 1000);
+            });
           } else {
-            // If post is visible in whole, wait a certain period of time.
-            window.setTimeout(deferred.resolve, 9000 / scroller.speed);
+            if (post.overflows(this.controls.getHeightPx())) {
+              // If post is not visible in whole, wait for some time and then slowly
+              // scroll to its bottom.
+              window.setTimeout(() => {
+                post.scrollToBottomSlowly(this.controls.getHeightPx()).then(() => {
+                  window.setTimeout(() => {
+                    resolve();
+                  }, 2000 / this.speed);
+                });
+              }, 6000 / this.speed);
+            } else {
+              // If post is visible in whole, wait a certain period of time.
+              window.setTimeout(resolve, 9000 / this.speed);
+            }
           }
-        }
+        });
       });
-
-      return deferred.promise();
     }
 
     // Start auto scrolling from the given post.
     _startScrollingFrom (post) {
-      var scroller = this;
-      if (scroller.stopped != false) {
-        scroller.stopped = true;
+      if (this.stopped != false) {
+        this.stopped = true;
         return;
       }
-      scroller._viewPost(post).then(function () {
-        scroller._startScrollingFrom(post.nextPost());
+      this._viewPost(post).then(() => {
+        this._startScrollingFrom(post.nextPost());
       });
     }
 
     // Main method.
     // Start scrolling from the current post on the screen.
     start () {
-      var scrollIsRunning = this.stopped === false || this.stopped === 'pending';
+      let scrollIsRunning = this.stopped === false || this.stopped === 'pending';
       this.stopped = false;
       if (!scrollIsRunning) {
         this._startScrollingFrom(Post.captureLastPostInScreen());
@@ -222,9 +216,9 @@
     }
 
     _buildDOM () {
-      var scroller = this.scroller;
+      let scroller = this.scroller;
 
-      var jControls = $('<div/>', {
+      let jControls = $('<div/>', {
         id: 'auto9gag-controls'
       }).css({
         height: this.getHeightPx() + 'px',
@@ -238,14 +232,14 @@
         display: '-webkit-flex'
       });
 
-      var buttonCss = {
+      let buttonCss = {
         color: 'white',
         'line-height': this.getHeightPx() + 'px',
         'font-weight': 'bold',
         'font-size': '18px'
       };
 
-      var jPlayButton = $('<div/>', {
+      let jPlayButton = $('<div/>', {
         id: 'auto9gag-play',
         text: scroller.stopped ? 'Play' : 'Stop'
       }).css(buttonCss).click(function () {
@@ -258,14 +252,14 @@
         }
       });
 
-      var jSpeedUpButton = $('<div/>', {
+      let jSpeedUpButton = $('<div/>', {
         id: 'auto9gag-speed-up',
         text: 'Faster'
       }).css(buttonCss).click(function () {
         scroller.changeSpeed(0.2);
       });
 
-      var jSpeedDownButton = $('<div/>', {
+      let jSpeedDownButton = $('<div/>', {
         id: 'auto9gag-speed-down',
         text: 'Slower'
       }).css(buttonCss).click(function () {
@@ -280,6 +274,6 @@
   }
 
 
-  var scroller = new Scroller();
+  let scroller = new Scroller();
 
 })();
