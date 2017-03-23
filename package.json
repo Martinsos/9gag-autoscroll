@@ -1,0 +1,23 @@
+{
+  "name": "9gag-autoscroll",
+  "version": "1.0.0",
+  "description": "",
+  "main": "9gag-autoscroll.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Martinsos/9gag-autoscroll.git"
+  },
+  "keywords": [
+    "9gag",
+    "autoscroll"
+  ],
+  "author": "Martin Sosic <sosic.martin@gmail.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Martinsos/9gag-autoscroll/issues"
+  },
+  "homepage": "https://github.com/Martinsos/9gag-autoscroll#readme"
+}
