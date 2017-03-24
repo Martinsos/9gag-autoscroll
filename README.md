@@ -7,34 +7,19 @@ Have you ever wanted to use 9gag while both of your hands were occupied? Now you
 It works only when browsing 9gag through web browser.
 
 ### Usage
-9gag autoscroll comes as a bookmarklet, meaning that you have to save it as a bookmark and then activate that bookmark while on 9gag in your browser, in order to unleash the power of autoscrolling.
 
-Create a bookmark which contains this code:
-
-    javascript:/* 9gag-autoscroll */(function(){var script = document.createElement('script'); script.setAttribute('src', 'https://rawgit.com/Martinsos/9gag-autoscroll/release/dist/9gag-autoscroll.js'); document.body.appendChild(script);})();
-
-Detailed steps:
-
-1. Select the code above and copy it, in order to get it in your clipboard.
-2. Open new tab in your browser (or any page really) and bookmark it. If asked, name it something like 9gag-autoscroll.
-3. Edit that bookmark that you just saved and paste the previously copied code in the bookmark's URL field.
-
-Now, when you want to use 9gag autoscroll while on 9gag in your browser, just activate the 9gag-autoscroll bookmark!
-
-In Chrome on your mobile phone, you can just start typing the name of the bookmark in the url field, it will find it for you (you will see the star next to the name).
+Check http://Martinsos.github.io/9gag-autoscroll.
 
 ### Building
 
-Run `npm run build` in order to build `dist/9gag-autoscroll.js` file, which contains all the code.
+Run `npm run build` in order to build `dist/9gag-autoscroll.js` file, which contains all the code needed for bookmarklet.
 
 You can also run `npm run serve` in order to have `dist/9gag-autoscroll.js` rebuilt on any changes in the code.
 
 ### Distribution
 
-`master` branch is used for development, while `release` branch is updated with stable commits from `master`, when they are ready to be published.
-Although it is a generated file, `dist/9gag-autoscroll.js` is included into git in order to make it available online.
-While it is not crucial to have it always up to date in `master` (although it would be good to have it), it shoud always be up to date in latest commit in `release` branch.
+We distribute the bookmarklet code by pushing it to gh-pages. Current mechanism is not as sofisticated as it could be, but it is simple: on `master` branch, we run `npm run build`, commit any changes and push the current state of the `master` branch to the `gh-pages` when we want to publish it.
 
-Therefore, procedure when releasing is: go to `master` branch, run `npm run build`, commit changes if there are any, go to `release` branch, rebase it to `master` and push it. You just released the last commit from `master`!
+Yes, this publishes all the files, even does that are not needed, but requires no complicated build process. In the future, we may consider replacing this with a real build process, where dist files are not commited to the git.
 
-Bookmarklet fetches only one file, `dist/9gag-autoscroll.js` (from its raw github URL from `release` branch), so that is the file that has to be up to date.
+Therefore, although it is a generated file, `dist/9gag-autoscroll.js` is included into git in order to make it available in `gh-pages`. While it is not crucial to have it always up to date in `master` (although it would be good to have it), it shoud always be up to date in latest commit in `gh-pages` branch.
