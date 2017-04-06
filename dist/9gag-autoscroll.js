@@ -82,10 +82,10 @@ class Scroller {
     // Speed of scrolling.
     this.speed = 1.0;
     // If true, auto scrolling stopped. If false, it is running.
-    // If 'pending', it is still running but it will stop as soon as it gets to read the value of stopped.
     this.stopped = true;
     // Create controls, so that user can control the scroller.
     this.controls = new __WEBPACK_IMPORTED_MODULE_1__Controls__["a" /* default */](this);
+    this._currentPost = null;
   }
 
   changeSpeed (speedChange) {
@@ -99,40 +99,44 @@ class Scroller {
   _viewPost (post) {
     return new Promise((resolve, reject) => {
       post.scrollTo().then(() => {
+        if (this.stopped) return;  // We need this line because scrolling is resolved even when canceled.
         if (post.isVeryLong() || post.isNSFW()) {
           // If post requires user action to be viewed, just skip it.
           resolve();
         } else if (post.isVideo()) {
           post.playVideo().then(() => {
             // Wait for a second and then continue.
-            window.setTimeout(resolve, 1000);
+            this._viewPostTimeout = window.setTimeout(resolve, 1000);
           });
         } else {
           if (post.overflows(this.controls.getHeightPx())) {
             // If post is not visible in whole, wait for some time and then slowly
             // scroll to its bottom.
-            window.setTimeout(() => {
+            this._viewPostTimeout = window.setTimeout(() => {
               post.scrollToBottomSlowly(this.controls.getHeightPx()).then(() => {
-                window.setTimeout(() => {
+                if (this.stopped) return;  // We need this line because scrolling is resolved even when canceled.
+                this._viewPostTimeout = window.setTimeout(() => {
                   resolve();
                 }, 2000 / this.speed);
               });
             }, 6000 / this.speed);
           } else {
             // If post is visible in whole, wait a certain period of time.
-            window.setTimeout(resolve, 9000 / this.speed);
+            this._viewPostTimeout = window.setTimeout(resolve, 9000 / this.speed);
           }
         }
       });
     });
   }
 
+  _stopViewingPost (post) {
+    window.clearTimeout(this._viewPostTimeout);
+    post.stop();
+  }
+
   // Start auto scrolling from the given post.
   _startScrollingFrom (post) {
-    if (this.stopped != false) {
-      this.stopped = true;
-      return;
-    }
+    this._currentPost = post;
     this._viewPost(post).then(() => {
       this._startScrollingFrom(post.nextPost());
     });
@@ -141,23 +145,22 @@ class Scroller {
   // Main method.
   // Start scrolling from the current post on the screen.
   start () {
-    let scrollIsRunning = this.stopped === false || this.stopped === 'pending';
+    if (!this.stopped) return;
     this.stopped = false;
-    if (!scrollIsRunning) {
-      this._startScrollingFrom(__WEBPACK_IMPORTED_MODULE_0__Post__["a" /* default */].captureLastPostInScreen());
-    }
+    this._startScrollingFrom(__WEBPACK_IMPORTED_MODULE_0__Post__["a" /* default */].captureLastPostInScreen());
   }
 
   stop () {
-    if (this.stopped === false) {
-      this.stopped = 'pending';
-    }
-    // TODO: stop and play mechanism is not really working well! It is hard to actually stop the
-    // viewing of current post. We should somehow be able to interrupt the viewing of the post and go on.
-    // Right now we have to wait until 'pending' is recognized by the current post viewing mechanism, which
-    // often takes a lof of time and if users presses play in the meantime it will not behave as expected.
-    // Idea: keep a pool of all timeouts and promises, and on stop just destroy them all and then start new
-    // scrolling.
+    if (this.stopped) return;
+    this.stopped = true;
+    this._stopViewingPost(this._currentPost);
+  }
+
+  skip () {
+    if (this.stopped) return;
+    this.stop();
+    this.stopped = false;
+    this._startScrollingFrom(this._currentPost.nextPost());
   }
 }
 /* harmony export (immutable) */ __webpack_exports__["a"] = Scroller;
@@ -222,6 +225,13 @@ class Controls {
       }
     });
 
+    let jSkipButton = $('<div/>', {
+      id: 'auto9gag-skip',
+      text: 'Skip'
+    }).css(buttonCss).click(function () {
+      scroller.skip();
+    });
+
     let jSpeedUpButton = $('<div/>', {
       id: 'auto9gag-speed-up',
       text: 'Faster'
@@ -237,6 +247,7 @@ class Controls {
     });
 
     jPlayButton.appendTo(jControls);
+    jSkipButton.appendTo(jControls);
     jSpeedDownButton.appendTo(jControls);
     jSpeedUpButton.appendTo(jControls);
     jControls.appendTo('body');
@@ -313,6 +324,18 @@ class Post {
     return $(this.element).find('.nsfw-mask').length > 0;
   }
 
+  _getVideo () {
+    return $(this.element).find('div.post-content video');
+  }
+
+  _stopVideo () {
+    if (!this.isVideo()) return console.error(this, ' is not a video post');
+    let jVideo = this._getVideo();
+    jVideo[0].pause();
+    jVideo.off('timeupdate', this._videoOnTimeUpdate);
+    window.clearTimeout(this._videoTimeout);
+  }
+
   /** Play video once and then stop it. Makes sense only for video posts.
    * @param minPlayTimeMs If video is shorter than given time (in miliseconds),
    *     play it repeatedly until given time passes. Default is 4000ms. Min is 1000ms.
@@ -327,22 +350,29 @@ class Post {
       // Here we asume that video was not already loaded and that there
       // is no video tag yet, only image.
       $(this.element).find('div.post-content img').click();
-      window.setTimeout(() => {
-        let jVideo = $(this.element).find('div.post-content video');
+      this._videoTimeout = window.setTimeout(() => {
+        let jVideo = this._getVideo();
         let lastTime = 0;
-        let onTimeUpdate = () => {
+        this._videoOnTimeUpdate = () => {
           let currentTime = jVideo[0].currentTime;
           if (currentTime >= lastTime) {
             lastTime = currentTime;
-          } else {  // Video restarted.
-            jVideo[0].pause();
-            jVideo.off('timeupdate', onTimeUpdate);
+          } else {  // Video restarted, so stop it.
+            this._stopVideo();
             resolve();
           }
         };
-        jVideo.on('timeupdate', onTimeUpdate);
+        jVideo.on('timeupdate', this._videoOnTimeUpdate);
       }, minPlayTimeMs);  // Let video play for at least minPlayTimeMs miliseconds.
     });
+  }
+
+  /**
+   * Stops any currently ongoing actions like scrolling or playing video.
+   */
+  stop () {
+    $('html, body').stop(true);  // Stop any scrolling.
+    if (this.isVideo()) this._stopVideo();
   }
 
   // Factory method, creates new post from the last post visible in the screen.

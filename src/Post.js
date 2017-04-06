@@ -60,6 +60,18 @@ export default class Post {
     return $(this.element).find('.nsfw-mask').length > 0;
   }
 
+  _getVideo () {
+    return $(this.element).find('div.post-content video');
+  }
+
+  _stopVideo () {
+    if (!this.isVideo()) return console.error(this, ' is not a video post');
+    let jVideo = this._getVideo();
+    jVideo[0].pause();
+    jVideo.off('timeupdate', this._videoOnTimeUpdate);
+    window.clearTimeout(this._videoTimeout);
+  }
+
   /** Play video once and then stop it. Makes sense only for video posts.
    * @param minPlayTimeMs If video is shorter than given time (in miliseconds),
    *     play it repeatedly until given time passes. Default is 4000ms. Min is 1000ms.
@@ -74,22 +86,29 @@ export default class Post {
       // Here we asume that video was not already loaded and that there
       // is no video tag yet, only image.
       $(this.element).find('div.post-content img').click();
-      window.setTimeout(() => {
-        let jVideo = $(this.element).find('div.post-content video');
+      this._videoTimeout = window.setTimeout(() => {
+        let jVideo = this._getVideo();
         let lastTime = 0;
-        let onTimeUpdate = () => {
+        this._videoOnTimeUpdate = () => {
           let currentTime = jVideo[0].currentTime;
           if (currentTime >= lastTime) {
             lastTime = currentTime;
-          } else {  // Video restarted.
-            jVideo[0].pause();
-            jVideo.off('timeupdate', onTimeUpdate);
+          } else {  // Video restarted, so stop it.
+            this._stopVideo();
             resolve();
           }
         };
-        jVideo.on('timeupdate', onTimeUpdate);
+        jVideo.on('timeupdate', this._videoOnTimeUpdate);
       }, minPlayTimeMs);  // Let video play for at least minPlayTimeMs miliseconds.
     });
+  }
+
+  /**
+   * Stops any currently ongoing actions like scrolling or playing video.
+   */
+  stop () {
+    $('html, body').stop(true);  // Stop any scrolling.
+    if (this.isVideo()) this._stopVideo();
   }
 
   // Factory method, creates new post from the last post visible in the screen.

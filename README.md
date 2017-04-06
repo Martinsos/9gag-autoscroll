@@ -16,6 +16,10 @@ Run `npm run build` in order to build `dist/9gag-autoscroll.js` file, which cont
 
 You can also run `npm run serve` in order to have `dist/9gag-autoscroll.js` rebuilt on any changes in the code.
 
+### Development
+
+To try it out, just build autoscroller nad copy code from `dist/9gag-autoscroll.js` to the development console while having mobile 9gag page open.
+
 ### Distribution
 
 We distribute the bookmarklet code by pushing it to gh-pages. Current mechanism is not as sofisticated as it could be, but it is simple: on `master` branch, we run `npm run build`, commit any changes and push the current state of the `master` branch to the `gh-pages` when we want to publish it.

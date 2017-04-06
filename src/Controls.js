@@ -51,6 +51,13 @@ export default class Controls {
       }
     });
 
+    let jSkipButton = $('<div/>', {
+      id: 'auto9gag-skip',
+      text: 'Skip'
+    }).css(buttonCss).click(function () {
+      scroller.skip();
+    });
+
     let jSpeedUpButton = $('<div/>', {
       id: 'auto9gag-speed-up',
       text: 'Faster'
@@ -66,6 +73,7 @@ export default class Controls {
     });
 
     jPlayButton.appendTo(jControls);
+    jSkipButton.appendTo(jControls);
     jSpeedDownButton.appendTo(jControls);
     jSpeedUpButton.appendTo(jControls);
     jControls.appendTo('body');
